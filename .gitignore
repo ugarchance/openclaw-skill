@@ -1,0 +1,8 @@
+venv/
+__pycache__/
+*.pyc
+cookies.dat
+*.mp4
+*.mov
+*.avi
+*.webm
