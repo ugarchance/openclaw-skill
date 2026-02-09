@@ -5,7 +5,26 @@ set -e
 SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 echo "Skill dizini: $SKILL_DIR"
 
-# 1. Python venv olustur
+# 1. Sistem paketleri (noVNC dahil — login icin zorunlu)
+echo "Sistem paketleri kontrol ediliyor..."
+NEED_INSTALL=false
+for pkg in xvfb x11vnc novnc; do
+    if ! dpkg -s "$pkg" &>/dev/null; then
+        NEED_INSTALL=true
+        break
+    fi
+done
+
+if [ "$NEED_INSTALL" = true ]; then
+    echo "Eksik paketler kuruluyor (xvfb, x11vnc, novnc)..."
+    apt-get update -qq
+    apt-get install -y -qq xvfb x11vnc novnc >/dev/null
+    echo "Sistem paketleri kuruldu."
+else
+    echo "Sistem paketleri zaten kurulu."
+fi
+
+# 2. Python venv olustur
 if [ ! -d "$SKILL_DIR/venv" ]; then
     echo "Python venv olusturuluyor..."
     python3 -m venv "$SKILL_DIR/venv"
@@ -14,45 +33,21 @@ else
     echo "venv zaten mevcut."
 fi
 
-# 2. Bagimliliklari kur
-echo "Bagimliliklar kuruluyor..."
+# 3. Bagimliliklari kur
+echo "Python bagimliliklari kuruluyor..."
 "$SKILL_DIR/venv/bin/pip" install -q -r "$SKILL_DIR/requirements.txt"
 echo "Bagimliliklar kuruldu."
 
-# 3. Gerekli programlari kontrol et
+# 4. Kontrol
 echo ""
-echo "Gereksinimler kontrol ediliyor..."
-
-check_bin() {
-    if command -v "$1" &>/dev/null; then
-        echo "  [OK] $1"
+echo "Kontrol:"
+for bin in google-chrome xvfb-run x11vnc websockify python3; do
+    if command -v "$bin" &>/dev/null; then
+        echo "  [OK] $bin"
     else
-        echo "  [EKSIK] $1 — kurulum gerekli"
+        echo "  [EKSIK] $bin"
     fi
-}
-
-check_bin google-chrome
-check_bin xvfb-run
-check_bin python3
-check_bin x11vnc
-check_bin websockify
-
-# 4. noVNC kontrolu (opsiyonel — mobilden login icin)
-echo ""
-if command -v websockify &>/dev/null && [ -d /usr/share/novnc ]; then
-    echo "noVNC: [OK] — mobilden login yapilabilir"
-else
-    echo "noVNC: [EKSIK] — mobilden login icin kur:"
-    echo "  sudo apt install -y novnc x11vnc"
-    echo "  (opsiyonel, SSH tunnel yontemi noVNC olmadan da calisir)"
-fi
+done
 
 echo ""
 echo "Kurulum tamamlandi!"
-echo ""
-echo "Simdi Google login yap:"
-echo "  bash $SKILL_DIR/scripts/login.sh"
-echo ""
-echo "Login yontemleri:"
-echo "  1. noVNC ile (mobilden de olur) — noVNC kuruluysa otomatik acar"
-echo "  2. SSH tunnel + Chrome DevTools — noVNC yoksa bu kullanilir"

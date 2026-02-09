@@ -7,154 +7,121 @@ metadata: {"openclaw":{"emoji":"🎬","os":["linux"],"requires":{"bins":["python
 
 # Gemini Video Analyzer
 
-Video dosyalarini Google AI Studio Playground uzerinden Gemini 3 Pro Preview ile analiz eder. API key gerektirmez.
+KRITIK KURALLAR — BUNLARI ASLA IHLAL ETME:
 
-ONEMLI: Bu skill'deki tum komutlari SEN (agent) calistir. Kullaniciya ASLA teknik komut, script yolu veya terminal talimati gonderme. Kullanici Telegram'dan mesaj atiyor, terminal erisimi yok. Kullaniciya sadece sade, anlasilir Turkce mesaj gonder.
+1. Kullaniciya ASLA teknik komut, script yolu, terminal talimati, SSH komutu, chrome://inspect adresi veya benzer teknik icerik gonderme. Kullanici Telegram'dan mesaj atiyor, terminal erisimi yok.
+2. Login islemi icin SADECE asagidaki "Login Akisi" bolumunu takip et. Kendi yontemini UYDURMA. SSH tunnel, chrome://inspect, remote debugging gibi alternatif yontemler YASAK.
+3. Login icin kullaniciya SADECE bir web linki (http://...) gonder. Bu linki asagidaki start_login.sh scripti uretir.
+4. Tum bash komutlarini SEN calistir, kullaniciya gosterme.
 
-## Calistirmadan Once — Kurulum Kontrolu
+## Adim 1 — Kurulum Kontrolu
 
-Video isleme komutunu calistirmadan once su kontrolleri yap:
-
-### 1. venv var mi?
+Her video islemeden once:
 
 ```bash
-test -d {baseDir}/venv && echo "OK" || echo "MISSING"
+test -d {baseDir}/venv && test -f {baseDir}/venv/bin/python && echo "VENV_OK" || echo "VENV_MISSING"
 ```
 
-"MISSING" ise kullaniciya mesaj gonder ve DURDUR:
+"VENV_MISSING" ise once kurulumu calistir:
 
+```bash
+bash {baseDir}/scripts/setup.sh
+```
+
+Kurulum basarisiz olursa kullaniciya de:
 > Simdilik video analiz ozelligi kullanima hazir degil. En kisa surede aktif edilecek.
 
-### 2. Google oturumu aktif mi?
+## Adim 2 — Oturum Kontrolu
 
 ```bash
-test -f {baseDir}/cookies.dat && echo "OK" || echo "MISSING"
+test -f {baseDir}/cookies.dat && echo "SESSION_OK" || echo "SESSION_MISSING"
 ```
 
-"MISSING" ise → Login Akisi'na git (asagida).
+"SESSION_OK" ise → Adim 4'e (Video Isleme) git.
+"SESSION_MISSING" ise → Adim 3'e (Login Akisi) git.
 
-Her iki kontrol de "OK" ise → Video Isleme'ye git.
+## Adim 3 — Login Akisi
 
-## Login Akisi (oturum yoksa)
+SADECE bu adimlari takip et. Baska yontem KULLANMA.
 
-Kullanici login yapmamissa asagidaki adimlari izle:
-
-### Adim 1 — Login oturumu baslat
+### 3a. Login oturumu baslat
 
 ```bash
 bash {baseDir}/scripts/start_login.sh
 ```
 
-Bu komut bir URL dondurur (ornegin `http://193.111.77.248:6080/vnc.html`). Bu URL'yi al.
+Bu komut stdout'a bir URL yazar (ornek: `http://193.111.77.248:6080/vnc.html`). Bu URL'yi al ve bir degiskende tut.
 
-### Adim 2 — Kullaniciya link gonder
+Eger komut hata verirse (noVNC eksik vs.), once setup calistir:
+```bash
+bash {baseDir}/scripts/setup.sh
+```
+Sonra start_login.sh'i tekrar dene.
 
-Kullaniciya su mesaji gonder (URL'yi komutun ciktisindaki gercek URL ile degistir):
+### 3b. Kullaniciya SADECE su mesaji gonder
 
-> Video analiz ozelligini kullanabilmek icin tek seferlik bir giris yapman gerekiyor. Cok kisa surecek!
+URL'yi komutun ciktisindaki gercek URL ile degistir:
+
+> Video analiz icin tek seferlik bir giris yapman gerekiyor. 1 dakikani alacak!
 >
-> 1. Su linki telefonundan veya bilgisayarindan ac: BURAYA_URL_GELECEK
-> 2. Acilan sayfada "Connect" butonuna bas
-> 3. Google hesabinla giris yap
-> 4. Giris yaptiktan sonra adres cubuguna aistudio.google.com yaz ve sayfanin acildigini gordukten sonra bana "tamam" yaz
+> Su linki ac: [BURAYA_URL_GELECEK]
+>
+> Acilan sayfada "Connect" a bas, sonra Google hesabinla giris yap. Giris yaptiktan sonra ayni sayfada adres cubuguna aistudio.google.com yaz. Sayfa acilinca bana "tamam" yaz.
 
-### Adim 3 — Kullanicinin "tamam" demesini bekle
+BASKA BIR SEY EKLEME. SSH, terminal, chrome://inspect gibi seylerden BAHSETME.
 
-Kullanici "tamam", "hazir", "yaptim", "oldu" gibi bir onay mesaji gonderene kadar bekle.
+### 3c. Kullanicinin yanit vermesini bekle
 
-### Adim 4 — Oturumu kaydet
+Kullanici "tamam", "hazir", "yaptim", "oldu", "ok", "done" gibi onay verene kadar bekle.
+
+### 3d. Oturumu kaydet
 
 ```bash
 bash {baseDir}/scripts/save_session.sh
 ```
 
-Cikti "OK:" ile basliyorsa basarili. Kullaniciya mesaj gonder:
+Cikti "OK:" ile basliyorsa → kullaniciya de:
+> Giris basarili! Artik bana video gonderebilirsin.
 
-> Giris basarili! Artik video gonderebilirsin, ben analiz edeyim.
+Hata varsa → kullaniciya de:
+> Giris tamamlanamadi. Tekrar deneyelim, sana yeni link gonderiyorum.
+Sonra 3a'ya don.
 
-Cikti "OK:" ile baslamiyorsa veya hata varsa:
+### 3e. Bekleyen video varsa
 
-> Giris sirasinda bir sorun olustu. Lutfen tekrar deneyelim — sana yeni bir link gonderiyorum.
+Login sonrasi kullanicinin onceden gonderdigi bir video varsa, dogrudan Adim 4 ile devam et.
 
-Ve Adim 1'e don.
-
-### Adim 5 — Eger kullanici video da gondermisse
-
-Login tamamlandiktan sonra, eger kullanicinin bekleyen bir videosu varsa dogrudan Video Isleme adimiyla devam et.
-
-## Video Isleme
-
-Asagidaki komutu SEN calistir:
+## Adim 4 — Video Isleme
 
 ```bash
 xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" {baseDir}/venv/bin/python {baseDir}/aistudio_bot.py --video "VIDEO_PATH" --prompt "PROMPT_TEXT"
 ```
 
 - `VIDEO_PATH`: Kullanicinin gonderdigi video dosyasinin yolu
-- `PROMPT_TEXT`: Kullanicinin videoyla birlikte yazdigi mesaj
+- `PROMPT_TEXT`: Kullanicinin videoyla yazdigi mesaj. Belirtmemisse kullan: `Bu videoyu detayli olarak analiz et ve icerigini ozetle.`
 
-Eger kullanici prompt belirtmemisse (sadece video gondermisse):
-```
-Bu videoyu detayli olarak analiz et ve icerigini ozetle.
-```
+## Adim 5 — Cikti Isleme
 
-## Cikti Isleme
+Komut stdout'a JSON yazar. Stdout'un **son satirini** parse et.
 
-Komut stdout'a JSON yazar. Sadece stdout'un **son satirini** parse et (onceki satirlar log olabilir).
-
-Basarili:
 ```json
-{"success": true, "response": "Videoda sunlar goruluyor..."}
+{"success": true, "response": "..."}
+{"success": false, "error": "..."}
 ```
 
-Basarisiz:
-```json
-{"success": false, "error": "Hata aciklamasi"}
-```
+**success: true** → `response` degerini oldugu gibi kullaniciya gonder.
 
-**`success: true` ise:** `response` degerini dogrudan kullaniciya gonder. Basina/sonuna ekstra bir sey ekleme.
+**success: false** → Asagidaki tabloya gore sade Turkce mesaj gonder. ASLA teknik hata mesajini gosterme:
 
-**`success: false` ise:** Kullaniciya teknik detay gosterme. Sade mesaj gonder:
-
-| error icerigi | Kullaniciya mesaj |
+| error icindeki kelime | Kullaniciya mesaj |
 |---|---|
-| "Google oturumu bulunamadi" | "Oturum suresi dolmus. Tekrar giris yapmamiz gerekiyor, sana link gonderiyorum." Sonra Login Akisi'na don. |
-| "Video yuklenemedi" | "Video yuklenirken bir sorun olustu. Lutfen tekrar gonderir misin?" |
-| "Desteklenmeyen video formati" | "Bu video formati desteklenmiyor. Lutfen mp4, mov veya webm olarak gonder." |
-| "Yanit alinamadi" | "Video islendi ama sonuc alinamadi. Biraz sonra tekrar dener misin?" |
-| "Video dosyasi bulunamadi" | "Video dosyasi okunamadi. Lutfen tekrar gonder." |
-| Diger | "Video islenirken bir sorun olustu. Biraz sonra tekrar dener misin?" |
-
-ONEMLI: "Google oturumu bulunamadi" hatasinda cookies.dat dosyasini sil ve Login Akisi'ni baslat:
-
-```bash
-rm -f {baseDir}/cookies.dat
-```
+| "oturumu bulunamadi" | cookies.dat sil (`rm -f {baseDir}/cookies.dat`) ve Adim 3'e don. Kullaniciya de: "Oturum suresi dolmus, tekrar giris yapmamiz gerekiyor." |
+| "yuklenemedi" | "Video yuklenirken sorun olustu. Tekrar gonderir misin?" |
+| "Desteklenmeyen" | "Bu format desteklenmiyor. mp4, mov veya webm olarak gonder." |
+| "alinamadi" | "Sonuc alinamadi. Biraz sonra tekrar dener misin?" |
+| "bulunamadi" | "Video okunamadi. Tekrar gonderir misin?" |
+| (diger) | "Video islenirken sorun olustu. Biraz sonra tekrar dener misin?" |
 
 ## Desteklenen Video Formatlari
 
 mp4, mpeg, mov, avi, flv, mpg, webm, wmv, 3gpp, 3gp
-
-## Kurulum Rehberi (sunucu yoneticisi icin — kullaniciya gosterme)
-
-Bu bolum sadece sunucu yoneticisinin ilk kurulumu icindir.
-
-### 1. Gerekli paketler
-
-```bash
-sudo apt install -y python3 python3-venv google-chrome-stable xvfb x11vnc novnc
-```
-
-### 2. Skill kurulumu
-
-```bash
-bash {baseDir}/scripts/setup.sh
-```
-
-### 3. Google login
-
-Login'i kullanicilar kendileri noVNC uzerinden yapar. Yonetici login yapmak isterse:
-
-```bash
-bash {baseDir}/scripts/login.sh
-```
