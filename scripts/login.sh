@@ -22,13 +22,19 @@ fi
 cleanup() {
     echo ""
     echo "Temizleniyor..."
-    killall -9 novnc_proxy x11vnc Xvfb google-chrome 2>/dev/null || true
+    # Chrome'u graceful kapat — profil verisi diske yazilsin
+    killall google-chrome 2>/dev/null || true
+    sleep 3
+    killall -9 google-chrome 2>/dev/null || true
+    killall -9 novnc_proxy x11vnc Xvfb 2>/dev/null || true
     echo "Temizlendi."
 }
 trap cleanup EXIT
 
 # Mevcut islemleri temizle
-killall -9 novnc_proxy x11vnc Xvfb google-chrome 2>/dev/null || true
+killall google-chrome 2>/dev/null || true
+sleep 2
+killall -9 google-chrome novnc_proxy x11vnc Xvfb 2>/dev/null || true
 sleep 1
 
 # noVNC kurulu mu kontrol et

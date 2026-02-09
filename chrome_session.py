@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import socket
 import nodriver as uc
 from pathlib import Path
 from config import (
@@ -13,9 +14,18 @@ from config import (
 log = logging.getLogger(__name__)
 
 
+def _is_port_open(host: str, port: int) -> bool:
+    """Port'un acik olup olmadigini kontrol et."""
+    try:
+        with socket.create_connection((host, port), timeout=2):
+            return True
+    except (OSError, ConnectionRefusedError):
+        return False
+
+
 async def start_browser(connect_existing: bool = True, headless: bool = False) -> uc.Browser:
     """Chrome'a baglan. Once mevcut instance'a baglanmayi dene, yoksa yeni baslat."""
-    if connect_existing:
+    if connect_existing and _is_port_open(CHROME_DEBUG_HOST, CHROME_DEBUG_PORT):
         try:
             browser = await uc.start(
                 host=CHROME_DEBUG_HOST,
@@ -25,12 +35,13 @@ async def start_browser(connect_existing: bool = True, headless: bool = False) -
             return browser
         except Exception as e:
             log.warning("Mevcut Chrome'a baglanamadi: %s — Yeni instance baslatiliyor", e)
+    elif connect_existing:
+        log.info("Port %d acik degil, direkt yeni Chrome baslatiliyor", CHROME_DEBUG_PORT)
 
     browser = await uc.start(
         headless=headless,
         user_data_dir=CHROME_PROFILE_DIR,
         browser_args=[
-            f"--remote-debugging-port={CHROME_DEBUG_PORT}",
             "--no-first-run",
             "--no-default-browser-check",
         ],
