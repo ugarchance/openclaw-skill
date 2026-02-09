@@ -21,3 +21,8 @@ killall google-chrome 2>/dev/null || true
 sleep 3
 killall -9 google-chrome 2>/dev/null || true
 killall -9 novnc_proxy x11vnc Xvfb 2>/dev/null || true
+
+# UFW varsa 6080 portunu kapat
+if command -v ufw &>/dev/null; then
+    ufw deny 6080/tcp >/dev/null 2>&1 || true
+fi

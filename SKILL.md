@@ -1,6 +1,6 @@
 ---
 name: gemini-video
-description: "Analyze videos using Google Gemini 3 Pro via AI Studio Playground. Receives a video file, uploads it to AI Studio through browser automation, sends a prompt, and returns Gemini's response. Works without an API key — uses the free Playground. Requires one-time Google login setup."
+description: "Analyze videos and YouTube links using Google Gemini 3 Pro via AI Studio Playground. Receives a video file or YouTube URL, processes it through browser automation, sends a prompt, and returns Gemini's response. Works without an API key — uses the free Playground. Requires one-time Google login setup."
 user-invocable: true
 metadata: {"openclaw":{"emoji":"🎬","os":["linux"],"requires":{"bins":["python3","google-chrome","xvfb-run"]},"install":[{"id":"setup","kind":"custom","label":"Run setup script: {baseDir}/scripts/setup.sh"}]}}
 ---
@@ -91,14 +91,52 @@ Sonra 3a'ya don.
 
 Login sonrasi kullanicinin onceden gonderdigi bir video varsa, dogrudan Adim 4 ile devam et.
 
-## Adim 4 — Video Isleme
+## Adim 4 — Video / YouTube Isleme
+
+Kullanici iki tur icerik gonderebilir:
+1. **Video dosyasi** (mp4, mov, webm vs.) → `--video` parametresi kullan
+2. **YouTube linki** (youtube.com/watch?v=... veya youtu.be/...) → `--youtube` parametresi kullan
+
+### 4a. Video dosyasi ile
 
 ```bash
-xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" {baseDir}/venv/bin/python {baseDir}/aistudio_bot.py --video "VIDEO_PATH" --prompt "PROMPT_TEXT"
+xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" {baseDir}/venv/bin/python {baseDir}/aistudio_bot.py --video "VIDEO_PATH" --prompt "PROMPT_TEXT" --model "MODEL_ID"
 ```
 
+### 4b. YouTube linki ile
+
+Kullanici mesajinda YouTube linki varsa (youtube.com veya youtu.be iceren URL):
+
+```bash
+xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" {baseDir}/venv/bin/python {baseDir}/aistudio_bot.py --youtube "YOUTUBE_URL" --prompt "PROMPT_TEXT" --model "MODEL_ID"
+```
+
+### Parametreler
+
 - `VIDEO_PATH`: Kullanicinin gonderdigi video dosyasinin yolu
+- `YOUTUBE_URL`: Kullanicinin gonderdigi YouTube linki (ornek: `https://www.youtube.com/watch?v=abc123`)
 - `PROMPT_TEXT`: Kullanicinin videoyla yazdigi mesaj. Belirtmemisse kullan: `Bu videoyu detayli olarak analiz et ve icerigini ozetle.`
+- `MODEL_ID`: Kullanilacak model. Belirtmemisse `--model` parametresini ekleme (varsayilan: gemini-3-pro-preview)
+
+ONEMLI: `--video` ve `--youtube` ayni anda KULLANILAMAZ. Birini sec.
+
+### Model Secimi
+
+| Kullanici ne derse | --model degeri |
+|---|---|
+| "pro", "pro kullan", "akilli model", "en iyi model" | gemini-3-pro-preview |
+| "flash", "flash kullan", "hizli model", "hizli" | gemini-3-flash-preview |
+| belirtmemisse | parametreyi ekleme (varsayilan pro kullanilir) |
+
+Ornek: Kullanici "bunu flash ile analiz et" derse:
+```bash
+xvfb-run ... {baseDir}/aistudio_bot.py --video "..." --prompt "..." --model "gemini-3-flash-preview"
+```
+
+Ornek: Kullanici YouTube linki ile "bunu ozetle" derse:
+```bash
+xvfb-run ... {baseDir}/aistudio_bot.py --youtube "https://www.youtube.com/watch?v=abc123" --prompt "bunu ozetle"
+```
 
 ## Adim 5 — Cikti Isleme
 
@@ -122,6 +160,7 @@ Komut stdout'a JSON yazar. Stdout'un **son satirini** parse et.
 | "bulunamadi" | "Video okunamadi. Tekrar gonderir misin?" |
 | (diger) | "Video islenirken sorun olustu. Biraz sonra tekrar dener misin?" |
 
-## Desteklenen Video Formatlari
+## Desteklenen Icerik Turleri
 
-mp4, mpeg, mov, avi, flv, mpg, webm, wmv, 3gpp, 3gp
+**Video dosyalari:** mp4, mpeg, mov, avi, flv, mpg, webm, wmv, 3gpp, 3gp
+**YouTube linkleri:** youtube.com/watch?v=..., youtu.be/..., youtube.com/shorts/...

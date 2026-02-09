@@ -4,6 +4,7 @@ Google AI Studio Video Isleme Bot
 
 Kullanim:
     python aistudio_bot.py --video /path/to/video.mp4 --prompt "Bu videoyu analiz et"
+    python aistudio_bot.py --youtube "https://youtube.com/watch?v=xxx" --prompt "Bu videoyu ozetle"
     python aistudio_bot.py --video /path/to/video.mp4  # Varsayilan prompt kullanir
 
 Cikti (stdout JSON):
@@ -234,6 +235,88 @@ async def upload_video(tab: uc.Tab, video_path: str) -> bool:
     return await _wait_for_upload_complete(tab)
 
 
+async def paste_youtube_url(tab: uc.Tab, youtube_url: str) -> bool:
+    """YouTube URL'sini clipboard paste ile AI Studio'ya ekle.
+
+    AI Studio, paste edilen YouTube URL'lerini otomatik algilar ve
+    video icerigi olarak yukler (chip olarak gorunur).
+    """
+    import re
+    log.info("YouTube URL yapistiriliyor: %s", youtube_url)
+
+    # YouTube URL dogrulamasi
+    yt_pattern = r'(youtube\.com/watch\?v=|youtu\.be/|youtube\.com/shorts/)'
+    if not re.search(yt_pattern, youtube_url):
+        log.error("Gecersiz YouTube URL: %s", youtube_url)
+        return False
+
+    # Textarea'ya fokusla
+    focused = await tab.evaluate(
+        """
+        (() => {
+            const ta = document.querySelector('textarea[aria-label="Enter a prompt"]')
+                || document.querySelector('textarea');
+            if (ta) { ta.focus(); return true; }
+            return false;
+        })()
+        """
+    )
+    if not focused:
+        log.error("Textarea bulunamadi!")
+        return False
+
+    await tab.sleep(0.3)
+
+    # ClipboardEvent ile paste — AI Studio YouTube URL'yi algilayip video olarak yukler
+    pasted = await tab.evaluate(
+        """
+        ((url) => {
+            const ta = document.querySelector('textarea[aria-label="Enter a prompt"]')
+                || document.querySelector('textarea');
+            if (!ta) return false;
+            ta.focus();
+            const evt = new ClipboardEvent('paste', {
+                bubbles: true,
+                cancelable: true,
+                clipboardData: new DataTransfer()
+            });
+            evt.clipboardData.setData('text/plain', url);
+            ta.dispatchEvent(evt);
+            return true;
+        })('""" + youtube_url.replace("'", "\\'") + """')
+        """
+    )
+
+    if not pasted:
+        log.error("Paste event gonderilemedi!")
+        return False
+
+    log.info("Paste event gonderildi, YouTube video yuklenmesi bekleniyor...")
+    await tab.sleep(3)
+
+    # YouTube Video chip'inin yuklenmesini bekle
+    elapsed = 0
+    while elapsed < UPLOAD_TIMEOUT:
+        has_chip = await tab.evaluate(
+            """
+            (() => {
+                const body = document.body.innerText || '';
+                return body.includes('YouTube Video') || body.includes('youtube.com');
+            })()
+            """
+        )
+        if has_chip:
+            log.info("YouTube video yuklendi! (%d sn)", elapsed)
+            return True
+
+        await tab.sleep(2)
+        elapsed += 2
+        log.info("YouTube video bekleniyor... (%d sn)", elapsed)
+
+    log.warning("YouTube video yukleme zaman asimi (%d sn)", UPLOAD_TIMEOUT)
+    return False
+
+
 async def _wait_for_upload_complete(tab: uc.Tab) -> bool:
     """Video yuklemesinin tamamlanmasini bekle."""
     log.info("Video yuklemesi bekleniyor (max %d sn)...", UPLOAD_TIMEOUT)
@@ -454,16 +537,20 @@ async def wait_for_response(tab: uc.Tab) -> str:
     return ""
 
 
-async def process_video(video_path: str, prompt: str, headless: bool = False) -> None:
-    """Ana islem: video yukle, prompt gonder, yanit al."""
-    video = Path(video_path)
-    if not video.exists():
-        output_result(False, error=f"Video dosyasi bulunamadi: {video_path}")
-        return
+async def process_video(video_path: str = None, youtube_url: str = None, prompt: str = DEFAULT_PROMPT, model: str = DEFAULT_MODEL, headless: bool = False) -> None:
+    """Ana islem: video yukle veya YouTube URL yapistir, prompt gonder, yanit al."""
+    if video_path:
+        video = Path(video_path)
+        if not video.exists():
+            output_result(False, error=f"Video dosyasi bulunamadi: {video_path}")
+            return
+        supported = {".mp4", ".mpeg", ".mov", ".avi", ".flv", ".mpg", ".webm", ".wmv", ".3gpp", ".3gp"}
+        if video.suffix.lower() not in supported:
+            output_result(False, error=f"Desteklenmeyen video formati: {video.suffix}")
+            return
 
-    supported = {".mp4", ".mpeg", ".mov", ".avi", ".flv", ".mpg", ".webm", ".wmv", ".3gpp", ".3gp"}
-    if video.suffix.lower() not in supported:
-        output_result(False, error=f"Desteklenmeyen video formati: {video.suffix}")
+    if not video_path and not youtube_url:
+        output_result(False, error="--video veya --youtube parametrelerinden biri gerekli")
         return
 
     try:
@@ -479,13 +566,18 @@ async def process_video(video_path: str, prompt: str, headless: bool = False) ->
         await tab.sleep(3)
 
         # 4. Model sec
-        if not await select_model(tab):
+        if not await select_model(tab, model):
             log.warning("Model secilemedi, varsayilan ile devam ediliyor")
 
-        # 5. Video yukle
-        if not await upload_video(tab, str(video.absolute())):
-            output_result(False, error="Video yuklenemedi")
-            return
+        # 5. Video yukle veya YouTube URL yapistir
+        if youtube_url:
+            if not await paste_youtube_url(tab, youtube_url):
+                output_result(False, error="YouTube videosu yuklenemedi")
+                return
+        else:
+            if not await upload_video(tab, str(Path(video_path).absolute())):
+                output_result(False, error="Video yuklenemedi")
+                return
 
         # 6. Prompt yaz
         if not await type_prompt(tab, prompt):
@@ -524,19 +616,28 @@ def main():
         epilog="""
 Ornekler:
   python aistudio_bot.py --video video.mp4 --prompt "Bu videoyu ozetle"
-  python aistudio_bot.py --video video.mp4
-  python aistudio_bot.py --video clip.mov --prompt "Videodaki kisileri say"
+  python aistudio_bot.py --youtube "https://youtube.com/watch?v=xxx" --prompt "Bunu analiz et"
+  python aistudio_bot.py --video video.mp4 --model gemini-3-flash-preview
         """,
     )
-    parser.add_argument(
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument(
         "--video", "-v",
-        required=True,
         help="Video dosyasinin yolu",
+    )
+    source.add_argument(
+        "--youtube", "-y",
+        help="YouTube video URL'si",
     )
     parser.add_argument(
         "--prompt", "-p",
         default=DEFAULT_PROMPT,
         help=f"Gemini'ye gonderilecek prompt (varsayilan: '{DEFAULT_PROMPT}')",
+    )
+    parser.add_argument(
+        "--model", "-m",
+        default=DEFAULT_MODEL,
+        help=f"Kullanilacak model ID'si (varsayilan: {DEFAULT_MODEL})",
     )
     parser.add_argument(
         "--headless",
@@ -546,7 +647,13 @@ Ornekler:
 
     args = parser.parse_args()
 
-    uc.loop().run_until_complete(process_video(args.video, args.prompt, headless=args.headless))
+    uc.loop().run_until_complete(process_video(
+        video_path=args.video,
+        youtube_url=args.youtube,
+        prompt=args.prompt,
+        model=args.model,
+        headless=args.headless,
+    ))
 
 
 if __name__ == "__main__":

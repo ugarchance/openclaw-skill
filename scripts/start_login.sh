@@ -8,6 +8,11 @@ PROFILE_DIR="${CHROME_PROFILE_DIR:-/tmp/aistudio-chrome-profile}"
 NOVNC_PORT=6080
 VNC_PORT=5900
 
+# UFW varsa 6080 portunu ac
+if command -v ufw &>/dev/null; then
+    ufw allow $NOVNC_PORT/tcp >/dev/null 2>&1 || true
+fi
+
 # Onceki islemleri temizle
 killall google-chrome 2>/dev/null || true
 sleep 1
